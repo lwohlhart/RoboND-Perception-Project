@@ -180,9 +180,15 @@ def pr2_mover(object_list):
 
     # TODO: Get/Read parameters
     pick_list = rospy.get_param('/object_list')    
+
+    # prepare dropbox definitions and place_poses to scatter the contents in the box
     dropboxes = {}
     for dropbox in rospy.get_param('/dropbox'):
         dropbox['droplist'] = []
+        dx = np.linspace(-0.2, 0.2, 5)
+        dy = np.linspace(-0.1, 0.1, 3)
+        dropbox['place_poses'] = zip(*(x.flat for x in np.meshgrid(dx,dy,0))) + np.array(dropbox['position'])
+        np.random.shuffle(dropbox['place_poses'])
         dropboxes[dropbox['group']] = dropbox
 
     test_scene_num = Int32()
@@ -194,7 +200,6 @@ def pr2_mover(object_list):
 
     # TODO: Parse parameters into individual variables
     
-    # TODO: Rotate PR2 in place to capture side tables for the collision map
     labels = []
     centroids = [] # to be list of tuples (x, y, z)
     for i, detected_object in enumerate(object_list):
@@ -224,10 +229,13 @@ def pr2_mover(object_list):
             continue
         
         # TODO: Create 'place_pose' for the object
+        place_poses = dropboxes[object_group]['place_poses']
+        pp = place_poses[np.mod(len(dropboxes[object_group]['droplist']), len(place_poses))]
         place_pose = Pose()        
-        place_pose.position.x = dropboxes[object_group]['position'][0]
-        place_pose.position.y = dropboxes[object_group]['position'][1]
-        place_pose.position.z = dropboxes[object_group]['position'][2]
+        place_pose.position.x = np.asscalar(pp[0])
+        place_pose.position.y = np.asscalar(pp[1])
+        place_pose.position.z = np.asscalar(pp[2])
+        dropboxes[object_group]['droplist'].append(object_name.data)
 
         # TODO: Assign the arm to be used for pick_place
         arm_name = String()
@@ -252,7 +260,7 @@ def pr2_mover(object_list):
             print "Service call failed: %s"%e
 
     # TODO: Output your request parameters into output yaml file
-    send_to_yaml('pick_{}.yaml'.format(test_scene_num.data), pick_object_yamls)
+    send_to_yaml('output_{}.yaml'.format(test_scene_num.data), pick_object_yamls)
 
 
 
